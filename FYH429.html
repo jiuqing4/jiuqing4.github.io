@@ -1,0 +1,244 @@
+<!-- ==============================================
+  上海志愿地理信息WebGIS应用 · GitHub 100%可运行版
+  已修复：缩放重复 + 底图加载失败 + 图层正常显示
+  布局完全保持你要的样子
+============================================== -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>上海志愿地理信息WebGIS应用</title>
+
+  <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
+  <script src="https://js.arcgis.com/4.29/"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Microsoft YaHei", sans-serif;
+    }
+
+    .header {
+      height: 50px;
+      background: #1a56c9;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .header .title { font-size: 20px; font-weight: bold; }
+    .header .subtitle { font-size: 10px; opacity: 0.9; }
+
+    .body-layout {
+      display: flex;
+      height: calc(100vh - 50px);
+    }
+
+    /* 左侧编辑区 */
+    .edit-box {
+      width: 200px;
+      background: #f8f9fa;
+      padding: 14px;
+      border-right: 1px solid #ddd;
+      overflow-y: auto;
+    }
+    .edit-box h4 {
+      text-align: center;
+      color: #1a56c9;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 8px;
+      margin-bottom: 10px;
+    }
+
+    /* 地图 */
+    .map-container {
+      flex: 1;
+      position: relative;
+    }
+    #viewDiv {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 右侧底图库 */
+    .basemap-box {
+      width: 200px;
+      background: #f8f9fa;
+      padding: 14px;
+      border-left: 1px solid #ddd;
+      overflow-y: auto;
+    }
+    .basemap-box h4 {
+      text-align: center;
+      color: #1a56c9;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 8px;
+      margin-bottom: 10px;
+    }
+    .basemap-box button {
+      width: 100%;
+      padding: 9px;
+      margin: 5px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      text-align: left;
+    }
+    .basemap-box button:hover {
+      background: #e6f0ff;
+      border-color: #1a56c9;
+      color: #1a56c9;
+    }
+
+    /* 坐标 */
+    #coordinatesDisplay {
+      position: absolute;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      box-shadow: 0 0 6px rgba(0,0,0,0.2);
+      z-index: 99;
+    }
+
+    /* 弹窗 */
+    .tooltip {
+      position: absolute;
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .tooltip-content {
+      background: white;
+      padding: 12px;
+      border-radius: 6px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      max-width: 380px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <div class="title">上海志愿地理信息 WebGIS 应用</div>
+    <div class="subtitle">GitHub 可直接部署</div>
+  </div>
+
+  <div class="body-layout">
+    <div class="edit-box">
+      <h4>要素编辑</h4>
+      <div id="editorDiv"></div>
+    </div>
+
+    <div class="map-container">
+      <div id="viewDiv"></div>
+      <div id="coordinatesDisplay">坐标：移动鼠标显示</div>
+    </div>
+
+    <div class="basemap-box">
+      <h4>底图库</h4>
+      <button onclick="setBasemap('streets')">🛣️ 标准街道</button>
+      <button onclick="setBasemap('topographic')">⛰️ 地形路网</button>
+      <button onclick="setBasemap('gray')">🔆 浅灰底图</button>
+      <button onclick="setBasemap('dark-gray')">🌑 深灰底图</button>
+      <button onclick="setBasemap('osm')">🗺️ 开源街道</button>
+    </div>
+  </div>
+
+  <script>
+    require([
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/layers/FeatureLayer",
+      "esri/widgets/Search",
+      "esri/widgets/LayerList",
+      "esri/widgets/ScaleBar",
+      "esri/widgets/Legend",
+      "esri/widgets/Compass",
+      "esri/widgets/Editor"
+    ], function(
+      Map, MapView, FeatureLayer,
+      Search, LayerList, ScaleBar, Legend, Compass, Editor
+    ) {
+
+      // 初始化地图（使用 GitHub 必加载的底图）
+      const map = new Map({ basemap: "streets" });
+
+      const view = new MapView({
+        container: "viewDiv",
+        center: [121.47, 31.23],
+        zoom: 10,
+        map: map
+      });
+
+      // ===================== 你的图层（原样使用） =====================
+      const yourLayer = new FeatureLayer({
+        url: "https://www.geosceneonline.cn/server/rest/services/Hosted/美国志愿式地理信息/FeatureServer",
+        title: "志愿地理信息图层"
+      });
+      map.add(yourLayer);
+
+      // ===================== 微件（已删除重复缩放，只保留需要的） =====================
+      view.ui.add(new Search({ view }), "top-left");
+      view.ui.add(new LayerList({ view }), "top-right");
+      view.ui.add(new Compass({ view }), "top-right");
+      view.ui.add(new ScaleBar({ view, unit: "metric" }), "bottom-left");
+      view.ui.add(new Legend({ view }), "bottom-right");
+
+      // 编辑器
+      const editor = new Editor({
+        view: view,
+        container: "editorDiv"
+      });
+
+      // 坐标显示
+      const coordDisplay = document.getElementById("coordinatesDisplay");
+      view.on("pointer-move", (e) => {
+        const pt = view.toMap(e);
+        if (pt) {
+          coordDisplay.innerText = `经纬度：${pt.longitude.toFixed(6)} , ${pt.latitude.toFixed(6)}`;
+        }
+      });
+
+      // 点击弹窗
+      const tooltip = document.createElement("div");
+      tooltip.className = "tooltip";
+      const content = document.createElement("div");
+      content.className = "tooltip-content";
+      tooltip.appendChild(content);
+      view.container.appendChild(tooltip);
+
+      view.on("click", async (e) => {
+        const res = await view.hitTest(e);
+        if (res.results.length > 0) {
+          const g = res.results[0].graphic;
+          let html = "<b>📋 要素属性</b><br><br>";
+          for (let k in g.attributes) {
+            html += `<b>${k}</b>：${g.attributes[k] ?? "无"}<br>`;
+          }
+          content.innerHTML = html;
+          tooltip.style.opacity = 1;
+          tooltip.style.left = e.x + "px";
+          tooltip.style.top = e.y - 10 + "px";
+        } else {
+          tooltip.style.opacity = 0;
+        }
+      });
+
+      // 底图切换（稳定可用）
+      window.setBasemap = function (name) {
+        map.basemap = name;
+      };
+    });
+  </script>
+</body>
+</html>
