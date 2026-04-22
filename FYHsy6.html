@@ -1,299 +1,291 @@
-<!-- ==============================================
-  课程实验最终提交版
-  实验名称：上海志愿地理信息WebGIS应用
-  开发框架：ArcGIS API for JavaScript 5.0
-
-  一、实验必做功能
-  1. 三区布局：页眉、地图主区域、底图库区域
-  2. 加载ArcGIS官方底图 + GeoScene在线专题图层
-  3. 必备微件：搜索、图层列表、比例尺、图例
-
-  二、实验拓展功能
-  1. 鼠标实时显示经纬度坐标
-  2. 点击要素弹出属性信息窗口
-  3. 地图缩放微件
-  4. 地图指南针微件（原生嵌入，右上角水平排列）
-  5. 左侧独立要素编辑面板
-  6. 10种专业底图自由切换
-============================================== -->
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>上海志愿地理信息WebGIS应用</title>
-  <script type="module" src="https://js.arcgis.com/5.0/"></script>
+
+  <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
+  <script src="https://js.arcgis.com/4.29/"></script>
 
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: "Microsoft YaHei", sans-serif;
-    }
-
-    /* 页眉样式 */
-    .header {
-      height: 50px;
-      background: #1a56c9;
-      color: #fff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .header .title {
-      font-size: 20px;
-      font-weight: bold;
-    }
-    .header .subtitle {
-      font-size: 10px;
-      opacity: 0.9;
-    }
-
-    /* 三栏布局 */
-    .body-layout {
-      display: flex;
-      height: calc(100vh - 50px);
-    }
-
-    /* 左侧编辑面板 */
-    .edit-box {
-      width: 200px;
-      background: #f8f9fa;
-      padding: 14px;
-      border-right: 1px solid #e0e0e0;
-      overflow-y: auto;
-    }
-    .edit-box h4 {
-      text-align: center;
-      margin-bottom: 12px;
-      color: #1a56c9;
-      border-bottom: 1px solid #d0d7e3;
-      padding-bottom: 8px;
-    }
-    #editorContainer {
-      width: 100%;
-    }
-
-    /* 地图区域 */
-    .map-container {
-      flex: 1;
-      position: relative;
-    }
-
-    /* 右侧底图库 */
-    .basemap-box {
-      width: 200px;
-      background: #f8f9fa;
-      padding: 14px;
-      border-left: 1px solid #e0e0e0;
-      overflow-y: auto;
-    }
-    .basemap-box h4 {
-      text-align: center;
-      margin-bottom: 12px;
-      color: #1a56c9;
-      border-bottom: 1px solid #d0d7e3;
-      padding-bottom: 8px;
-    }
+    * { margin:0; padding:0; box-sizing:border-box; font-family:"Microsoft YaHei",sans-serif; }
+    .header { height:50px; background:#1a56c9; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+    .header .title { font-size:20px; font-weight:bold; }
+    .body-layout { display:flex; height:calc(100vh - 50px); }
+    .edit-box { width:200px; background:#f8f9fa; padding:14px; border-right:1px solid #e0e0e0; overflow-y:auto; }
+    .edit-box h4 { text-align:center; margin-bottom:12px; color:#1a56c9; border-bottom:1px solid #d0d7e3; padding-bottom:8px; }
+    #editorDiv { width:100%; }
+    .map-container { flex:1; position:relative; }
+    #viewDiv { width:100%; height:100%; }
+    .basemap-box { width:200px; background:#f8f9fa; padding:14px; border-left:1px solid #e0e0e0; overflow-y:auto; }
+    .basemap-box h4 { text-align:center; margin-bottom:12px; color:#1a56c9; border-bottom:1px solid #d0d7e3; padding-bottom:8px; }
     .basemap-box button {
-      width: 100%;
-      padding: 10px 8px;
-      margin: 6px 0;
-      border: 1px solid #d0d7e3;
-      border-radius: 6px;
-      background: #fff;
-      cursor: pointer;
-      font-size: 14px;
-      transition: 0.2s;
-      text-align: left;
+      width:100%; padding:10px 8px; margin:6px 0;
+      border:1px solid #d0d7e3; border-radius:6px;
+      background:#fff; cursor:pointer; font-size:14px;
+      transition:0.2s; text-align:left;
     }
-    .basemap-box button:hover {
-      background: #e6f0ff;
-      border-color: #1a56c9;
-      color: #1a56c9;
-    }
+    .basemap-box button:hover { background:#e6f0ff; border-color:#1a56c9; color:#1a56c9; }
+    #coordinatesDisplay { position:absolute; bottom:15px; left:50%; transform:translateX(-50%); background:white; padding:6px 12px; border-radius:4px; font-size:12px; box-shadow:0 0 6px rgba(0,0,0,0.2); z-index:98; }
 
-    /* 弹窗样式 */
-    .tooltip {
+    /* 点击弹窗样式 */
+    .popup-panel {
       position: absolute;
       pointer-events: none;
       transition: opacity 0.3s;
       z-index: 1000;
     }
-    .tooltip > div {
+    .popup-content {
       background: white;
       padding: 12px;
       border-radius: 6px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    }
-
-    /* 底部坐标 */
-    #coordinatesDisplay {
-      position: absolute;
-      bottom: 15px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: white;
-      padding: 6px 12px;
-      border-radius: 4px;
-      font-size: 12px;
-      box-shadow: 0 0 6px rgba(0,0,0,0.2);
-      z-index: 98;
+      font-size: 13px;
+      line-height: 1.5;
     }
   </style>
 </head>
 
 <body>
-  <!-- 页眉 -->
+  <!-- 顶部标题 -->
   <div class="header">
     <div class="title">上海志愿地理信息 WebGIS 应用</div>
-    <div class="subtitle">ArcGIS API for JavaScript 5.0 | 课程实验成果</div>
+    <div class="subtitle">ArcGIS 4.29 | GitHub 稳定版</div>
   </div>
 
   <!-- 主体布局 -->
   <div class="body-layout">
-    <!-- 左侧编辑区 -->
+    <!-- 左侧编辑面板 -->
     <div class="edit-box">
       <h4>要素编辑</h4>
-      <div id="editorContainer"></div>
+      <div id="editorDiv"></div>
     </div>
 
-    <!-- 中间地图 -->
+    <!-- 中间地图容器 -->
     <div class="map-container">
-      <arcgis-map center="121.47, 31.23" zoom="10">
-        <!-- 左上角 -->
-        <arcgis-search slot="top-left"></arcgis-search>
-        <arcgis-zoom slot="top-left"></arcgis-zoom>
-
-        <!-- 右上角：水平并排 → 左：图层列表  右：指南针 -->
-        <arcgis-layer-list slot="top-right"></arcgis-layer-list>
-        <arcgis-compass slot="top-right"></arcgis-compass>
-
-        <!-- 左下角 -->
-        <arcgis-scale-bar slot="bottom-left" metric bar-style="ruler"></arcgis-scale-bar>
-
-        <!-- 右下角 -->
-        <arcgis-legend slot="bottom-right" style="width:150px;max-height:2000px;overflow:auto;"></arcgis-legend>
-      </arcgis-map>
-
+      <div id="viewDiv"></div>
       <div id="coordinatesDisplay">坐标：等待移动鼠标...</div>
     </div>
 
-    <!-- 右侧底图库（已修复标签闭合） -->
+    <!-- 右侧底图切换面板【已美化：统一图标+统一命名】 -->
     <div class="basemap-box">
-      <h4>底图库</h4>
-      <button onclick="setBasemap('navigation')">🧭 日间导航</button>
-      <button onclick="setBasemap('navigation-night')">🌙 夜间导航</button>
-      <button onclick="setBasemap('streets')">🛣️ 标准街道</button>
-      <button onclick="setBasemap('streets-night')">🌃 夜间街道</button>
-      <button onclick="setBasemap('community')">🏘️ 社区风格</button>
-      <button onclick="setBasemap('outdoor')">🏔️ 户外地形</button>
-      <button onclick="setBasemap('topographic')">🗻 地形路网</button>
-      <button onclick="setBasemap('imagery')">🛰️ 卫星影像</button>
-      <button onclick="setBasemap('light-gray')">🔆 浅灰底图</button>
-      <button onclick="setBasemap('dark-gray')">🌑 深灰底图</button>
+      <h4>底图切换</h4>
+      <button onclick="setBasemap('osm')">🌍 标准街道底图</button>
+      <button onclick="setBasemap('osm_hot')">🛠️ 清晰街道底图</button>
+      <button onclick="setBasemap('cartolight')">🔆 浅色简洁底图</button>
+      <button onclick="setBasemap('cartodark')">🌙 深色简洁底图</button>
+      <button onclick="setBasemap('cyclosm')">🌃 夜间街道底图</button>
+      <button onclick="setBasemap('layershade')">🌈 彩色柔和底图</button>
+      <button onclick="setBasemap('cleanlight')">🧊 纯净无标底图</button>
+      <button onclick="setBasemap('basic')">📝 极简标注底图</button>
     </div>
   </div>
 
-  <script type="module">
-    // 导入模块
-    const [
-      config,
-      Basemap,
-      BasemapStyle,
-      FeatureLayer,
-      promiseUtils,
-      Editor
-    ] = await $arcgis.import([
-      "@arcgis/core/config.js",
-      "@arcgis/core/Basemap.js",
-      "@arcgis/core/support/BasemapStyle.js",
-      "@arcgis/core/layers/FeatureLayer.js",
-      "@arcgis/core/core/promiseUtils.js",
-      "@arcgis/core/widgets/Editor.js"
-    ]);
+  <script>
+    require([
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/layers/FeatureLayer",
+      "esri/widgets/Zoom",
+      "esri/widgets/Search",
+      "esri/widgets/LayerList",
+      "esri/widgets/ScaleBar",
+      "esri/widgets/Legend",
+      "esri/widgets/Compass",
+      "esri/widgets/Editor",
+      "esri/Basemap",
+      "esri/layers/WebTileLayer",
+      "esri/core/promiseUtils"
+    ], function(
+      Map, MapView, FeatureLayer,
+      Zoom, Search, LayerList, ScaleBar, Legend, Compass, Editor,
+      Basemap, WebTileLayer, promiseUtils
+    ) {
 
-    // API密钥
-    const apiKey = "%YOUR_ACCESS_TOKEN%";
-    config.apiKey = apiKey;
-
-    // 初始化地图
-    const viewElement = document.querySelector("arcgis-map");
-    viewElement.basemap = new Basemap({
-      style: new BasemapStyle({ id: "arcgis/navigation" })
-    });
-
-    await viewElement.viewOnReady();
-    const view = viewElement.view;
-
-    // 实时坐标
-    const coordDisplay = document.getElementById("coordinatesDisplay");
-    view.on("pointer-move", (event) => {
-      const point = view.toMap(event);
-      if (point) {
-        coordDisplay.innerText = `经纬度：${point.longitude.toFixed(6)} , ${point.latitude.toFixed(6)}`;
-      }
-    });
-
-    // 加载专题图层
-    const featureLayer = new FeatureLayer({
-      url: "https://www.geosceneonline.cn/server/rest/services/Hosted/美国志愿式地理信息/FeatureServer",
-      title: "志愿地理信息图层",
-      opacity: 1,
-      outFields: ["*"]
-    });
-    view.map.add(featureLayer);
-
-    // 编辑工具
-    const editor = new Editor({
-      view: view,
-      layerInfos: [{ layer: featureLayer, enabled: true }]
-    });
-    editor.container = "editorContainer";
-
-    // 底图切换
-    window.setBasemap = function (styleName) {
-      viewElement.basemap = new Basemap({
-        style: new BasemapStyle({ id: `arcgis/${styleName}` })
+      // ======================================
+      // 1. 底图配置（全部国内稳定加载）
+      // ======================================
+      // 暗黑底图（用户指定，保持不变）
+      const baseCyclOSM = new Basemap({
+        baseLayers: [new WebTileLayer({
+          urlTemplate: "https://{subDomain}.tile-cyclosm.openstreetmap.fr/cyclosm/{level}/{col}/{row}.png",
+          subDomains: ["a", "b", "c", "d"]
+        })]
       });
-    };
 
-    // 点击弹窗
-    const tooltip = createTooltip();
-    viewElement.addEventListener("arcgisViewClick", promiseUtils.debounce(async (e) => {
-      const res = await view.hitTest(e.detail, { include: featureLayer });
-      if (res.results.length > 0) {
-        const g = res.results[0].graphic;
-        let html = "<b>📋 要素属性信息</b><br><br>";
-        for (let k in g.attributes) {
-          html += `<b>${k}</b>：${g.attributes[k] ?? "无"}<br>`;
+      // 标准底图
+      const baseOsm = new Basemap({
+        baseLayers: [new WebTileLayer({
+          urlTemplate: "https://tile.openstreetmap.de/{level}/{col}/{row}.png"
+        })]
+      });
+
+      // OSM 人道主义
+      const baseOsmHot = new Basemap({
+        baseLayers: [new WebTileLayer({
+          urlTemplate: "https://{subDomain}.tile.openstreetmap.fr/hot/{level}/{col}/{row}.png",
+          subDomains: ["a", "b", "c", "d"]
+        })]
+      });
+
+      // Carto 浅灰
+      const baseCartoLight = new Basemap({
+        baseLayers: [new WebTileLayer({
+          urlTemplate: "https://{subDomain}.basemaps.cartocdn.com/light_all/{level}/{col}/{row}.png",
+          subDomains: ["a", "b", "c", "d"]
+        })]
+      });
+
+      // Carto 暗黑
+      const baseCartoDark = new Basemap({
+        baseLayers: [new WebTileLayer({
+          urlTemplate: "https://{subDomain}.basemaps.cartocdn.com/dark_all/{level}/{col}/{row}.png",
+          subDomains: ["a", "b", "c", "d"]
+        })]
+      });
+
+      // OSM 柔和版
+      const baseLayerShade = new Basemap({
+        baseLayers: [new WebTileLayer({
+          urlTemplate: "https://{subDomain}.basemaps.cartocdn.com/rastertiles/voyager/{level}/{col}/{row}.png",
+          subDomains: ["a", "b", "c", "d"]
+        })]
+      });
+
+      // 干净浅色（无标注）
+      const baseCleanLight = new Basemap({
+        baseLayers: [new WebTileLayer({
+          urlTemplate: "https://{subDomain}.basemaps.cartocdn.com/light_nolabels/{level}/{col}/{row}.png",
+          subDomains: ["a", "b", "c", "d"]
+        })]
+      });
+
+      // 基础极简（仅标注）
+      const baseBasic = new Basemap({
+        baseLayers: [new WebTileLayer({
+          urlTemplate: "https://{subDomain}.basemaps.cartocdn.com/rastertiles/light_only_labels/{level}/{col}/{row}.png",
+          subDomains: ["a", "b", "c", "d"]
+        })]
+      });
+
+      // ======================================
+      // 2. 初始化地图与视图
+      // ======================================
+      const map = new Map({ basemap: baseOsm });
+
+      const view = new MapView({
+        container: "viewDiv",
+        map: map,
+        center: [121.481540, 31.215988],
+        zoom: 11,
+        constraints: { minZoom:3, maxZoom:20 }
+      });
+
+      // 移除默认控件
+      view.ui.remove("zoom");
+      view.ui.remove("compass");
+
+      // ======================================
+      // 3. 加载业务图层
+      // ======================================
+      const featureLayer = new FeatureLayer({
+        url: "https://www.geosceneonline.cn/server/rest/services/Hosted/上海志愿服务信息/FeatureServer",
+        title: "志愿地理信息",
+        outFields: ["*"]
+      });
+      map.add(featureLayer);
+
+      // ======================================
+      // 4. 添加地图控件
+      // ======================================
+      view.ui.add(new Search({ view }), "top-left");
+      view.ui.add(new Zoom({ view }), "top-left");
+      view.ui.add(new LayerList({ view }), "top-right");
+      view.ui.add(new Compass({ view }), "top-right");
+      view.ui.add(new ScaleBar({ view, unit:"metric" }), "bottom-left");
+      view.ui.add(new Legend({ view, style:{width:150,maxHeight:200} }), "bottom-right");
+
+      // ======================================
+      // 5. 要素编辑器
+      // ======================================
+      const editor = new Editor({
+        view: view,
+        container: "editorDiv",
+        layerInfos: [{ layer: featureLayer, enabled: true }]
+      });
+
+      // ======================================
+      // 6. 鼠标坐标实时显示
+      // ======================================
+      const coordDisplay = document.getElementById("coordinatesDisplay");
+      view.on("pointer-move", function(e) {
+        const pt = view.toMap(e);
+        if(pt) coordDisplay.innerText = `经纬度：${pt.longitude.toFixed(6)} , ${pt.latitude.toFixed(6)}`;
+      });
+
+      // ======================================
+      // 7. 底图切换功能
+      // ======================================
+      window.setBasemap = function(name){
+        switch(name){
+          case "osm": map.basemap = baseOsm; break;
+          case "osm_hot": map.basemap = baseOsmHot; break;
+          case "cartolight": map.basemap = baseCartoLight; break;
+          case "cartodark": map.basemap = baseCartoDark; break;
+          case "cyclosm": map.basemap = baseCyclOSM; break;
+          case "layershade": map.basemap = baseLayerShade; break;
+          case "cleanlight": map.basemap = baseCleanLight; break;
+          case "basic": map.basemap = baseBasic; break;
+          default: map.basemap = baseOsm;
         }
-        tooltip.show({ x: e.detail.x, y: e.detail.y }, html);
-      } else {
-        tooltip.hide();
-      }
-    }));
-
-    function createTooltip() {
-      const el = document.createElement("div");
-      el.className = "tooltip";
-      const c = document.createElement("div");
-      el.appendChild(c);
-      viewElement.appendChild(el);
-      return {
-        show(p, html) {
-          el.style.opacity = 1;
-          el.style.left = p.x + "px";
-          el.style.top = p.y - 10 + "px";
-          c.innerHTML = html;
-        },
-        hide() { el.style.opacity = 0; }
       };
-    }
+
+      // ======================================
+      // 8. 点击地图 弹出要素属性窗口
+      // ======================================
+      const popup = createPopup();
+      view.on("click", promiseUtils.debounce(async (event) => {
+        const response = await view.hitTest(event, { include: featureLayer });
+        if (response.results.length > 0) {
+          const graphic = response.results[0].graphic;
+          let content = "<b>📋 志愿服务要素信息</b><br><br>";
+          for (let field in graphic.attributes) {
+            content += `<b>${field}</b>：${graphic.attributes[field] ?? "无"}<br>`;
+          }
+          popup.show({ x: event.x, y: event.y }, content);
+        } else {
+          popup.hide();
+        }
+      }));
+
+      // 弹窗创建工具函数
+      function createPopup() {
+        const panel = document.createElement("div");
+        panel.className = "popup-panel";
+        const content = document.createElement("div");
+        content.className = "popup-content";
+        panel.appendChild(content);
+        view.container.appendChild(panel);
+        return {
+          show(point, html) {
+            panel.style.opacity = "1";
+            panel.style.left = point.x + "px";
+            panel.style.top = (point.y - 10) + "px";
+            content.innerHTML = html;
+          },
+          hide() {
+            panel.style.opacity = "0";
+          }
+        };
+      }
+
+      // 地图加载完成提示
+      view.when(()=>{
+        console.log("✅ 地图加载完成")
+      });
+
+    });
   </script>
 </body>
 </html>
